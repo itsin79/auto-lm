@@ -1,0 +1,138 @@
+// NODE_PATH=<directory containing playwright> node tests/vehicle-picker.browser.cjs
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+(async () => {
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || chromium.executablePath() });
+  try {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, timezoneId: 'Asia/Tehran', isMobile: true, hasTouch: true });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    const checks = [];
+    const data = () => page.evaluate(() => JSON.parse(localStorage.getItem('carcheck_inspections_v2')));
+    const check = name => checks.push(name);
+    await page.goto(process.env.VEHICLE_TEST_URL || 'http://127.0.0.1:4173');
+    await page.locator('[name="mobile"]').fill('09990000991');
+    await page.locator('[form="mobile-form"]').click();
+    for (let i = 0; i < 4; i++) await page.locator(`[data-otp="${i}"]`).fill('1');
+    await page.locator('[form="otp-form"]').click();
+    const model = page.locator('#vehicle-model');
+    const year = page.locator('#vehicle-year');
+    await model.focus();
+    assert.ok(await page.locator('#vehicle-model-list [role="option"]').count() > 100);
+    assert.equal((await data())?.inspections?.length || 0, 0);
+    check('Opening suggestions does not create a draft');
+    for (const query of ['207', '۲۰۷', '٢٠٧', 'اتوماتیک 207', 'Peugeot 207']) {
+      await model.fill(query);
+      const matches = await page.locator('#vehicle-model-list [role="option"]').allTextContents();
+      assert.ok(matches.some(label => label.includes('۲۰۷ اتوماتیک')), query);
+      assert.equal(await model.inputValue(), query);
+    }
+    await model.fill('كيا اسپورتيج');
+    assert.equal(await page.locator('#vehicle-model-list [role="option"]').count(), 1);
+    check('Persian, Arabic, Latin digits, brand aliases and mixed word order match without automatic selection');
+    await model.fill('207');
+    await page.getByRole('option', { name: 'پژو ۲۰۷ اتوماتیک', exact: true }).tap();
+    assert.equal(await model.inputValue(), 'پژو ۲۰۷ اتوماتیک');
+    assert.equal(await model.getAttribute('aria-expanded'), 'false');
+    const identity = (await data()).inspections[0].id;
+    assert.equal((await data()).inspections[0].vehicle.model, 'پژو ۲۰۷ اتوماتیک');
+    check('Touch selection saves the canonical model into the existing draft');
+    await year.fill('۱۴۰۲');
+    assert.equal(await page.locator('#vehicle-year-list [role="option"]').count(), 1);
+    await page.locator('#vehicle-year-list [role="option"]').tap();
+    assert.equal((await data()).inspections[0].vehicle.year, '1402');
+    await year.click();
+    await page.locator('[data-vehicle-calendar="gregory"]').tap();
+    assert.ok(await page.locator('#vehicle-year-list [role="option"]').count() > 100);
+    assert.equal(await year.inputValue(), '۱۴۰۲');
+    await year.fill('٢٠٢٣');
+    assert.equal(await page.locator('[data-vehicle-calendar="gregory"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('#vehicle-year-list [role="option"]').count(), 1);
+    await page.locator('#vehicle-year-list [role="option"]').tap();
+    assert.equal((await data()).inspections[0].vehicle.year, '2023');
+    check('Solar and Gregorian years filter, select and persist with normalized digits');
+    await page.locator('[data-vehicle-clear="year"]').tap();
+    await page.locator('[data-vehicle-calendar="gregory"]').tap();
+    assert.ok(await page.locator('#vehicle-year-list [role="option"]').count() > 100);
+    await page.getByRole('option', { name: '۲۰۲۴', exact: true }).tap();
+    assert.equal((await data()).inspections[0].vehicle.year, '2024');
+    await page.reload();
+    assert.equal(await model.inputValue(), 'پژو ۲۰۷ اتوماتیک');
+    assert.equal(await year.inputValue(), '۲۰۲۴');
+    assert.equal((await data()).inspections[0].id, identity);
+    check('Calendar switching, clearing, reloading and draft identity remain consistent');
+    await model.fill('پونتیاک Firebird');
+    assert.equal(await page.locator('#vehicle-model-list [role="option"]').count(), 0);
+    await page.locator('[data-vehicle-manual]').tap();
+    assert.equal((await data()).inspections[0].vehicle.model, 'پونتیاک Firebird');
+    await page.reload();
+    assert.equal(await model.inputValue(), 'پونتیاک Firebird');
+    await model.fill('<img src=x onerror=alert(1)>');
+    assert.equal(await page.locator('#vehicle-model-popup img').count(), 0);
+    assert.ok((await page.locator('[data-vehicle-manual]').textContent()).includes('<img'));
+    check('Unlisted vehicles remain editable and suggestion text is escaped');
+    await model.fill('207');
+    await model.press('ArrowDown');
+    const active = await model.getAttribute('aria-activedescendant');
+    assert.ok(active);
+    const expected = (await page.locator(`#${active}`).textContent()).trim();
+    await model.press('Enter');
+    assert.equal(await model.inputValue(), expected);
+    assert.equal(await page.locator('#vehicle-form').count(), 1);
+    await model.press('ArrowDown');
+    await model.press('Escape');
+    assert.equal(await model.getAttribute('aria-expanded'), 'false');
+    assert.equal(await model.getAttribute('aria-activedescendant'), null);
+    check('Arrow keys, explicit Enter selection and Escape work without accidental form submission');
+    await model.fill('207');
+    await model.press('Enter');
+    assert.equal(await model.inputValue(), '207');
+    assert.equal(await page.locator('#vehicle-form').count(), 1);
+    await model.fill('207');
+    await page.getByRole('option', { name: 'پژو ۲۰۷ اتوماتیک', exact: true }).tap();
+    await year.fill('۱۴۰۲');
+    await page.locator('#vehicle-year-list [role="option"]').tap();
+    const responsive = [];
+    for (const width of [320, 375, 390, 430, 760, 1398]) {
+      await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
+      await model.fill('207');
+      const modelMetrics = await page.evaluate(() => {
+        const popup = document.querySelector('#vehicle-model-popup').getBoundingClientRect();
+        return { width: innerWidth, pageWidth: document.documentElement.scrollWidth, popupLeft: popup.left, popupRight: popup.right, optionHeight: document.querySelector('#vehicle-model-list [role="option"]').getBoundingClientRect().height };
+      });
+      assert.equal(modelMetrics.pageWidth, width);
+      assert.ok(modelMetrics.popupLeft >= 0 && modelMetrics.popupRight <= width);
+      assert.ok(modelMetrics.optionHeight >= 44);
+      if ([390, 1398].includes(width)) {
+        await page.screenshot({ path: path.join(__dirname, '..', 'artifacts', `vehicle-picker-${width}.png`), fullPage: true });
+      }
+      await page.getByRole('option', { name: 'پژو ۲۰۷ اتوماتیک', exact: true }).tap();
+      await year.fill('۱۴');
+      assert.ok(await page.locator('#vehicle-year-list [role="option"]').count() > 0);
+      if (width === 390) await page.screenshot({ path: path.join(__dirname, '..', 'artifacts', 'vehicle-year-picker-390.png'), fullPage: true });
+      responsive.push(modelMetrics);
+      await year.fill('۱۴۰۲');
+      await page.locator('#vehicle-year-list [role="option"]').tap();
+    }
+    check('No horizontal overflow at 320, 375, 390, 430, 760 and 1398px; touch targets are at least 44px');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('[form="vehicle-form"]').tap();
+    assert.equal(await page.locator('#vehicle-form').count(), 0);
+    assert.equal((await data()).inspections[0].id, identity);
+    assert.equal((await data()).inspections[0].step, 'body');
+    await page.locator('[data-action="back"]').tap();
+    assert.equal(await model.inputValue(), 'پژو ۲۰۷ اتوماتیک');
+    assert.equal(await year.inputValue(), '۱۴۰۲');
+    await page.screenshot({ path: path.join(__dirname, '..', 'artifacts', 'vehicle-form-390.png'), fullPage: true });
+    check('Confirming advances to inspection; returning retains the selected model, year and draft');
+    assert.deepEqual(errors, []);
+    fs.writeFileSync(path.join(__dirname, '..', 'artifacts', 'vehicle-picker-verification.json'), JSON.stringify({ checks, responsive, errors }, null, 2) + '\n');
+    console.log(JSON.stringify({ passed: checks.length, checks, errors }, null, 2));
+    await context.close();
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });
