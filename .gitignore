@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.data/
+**/.dev.vars*
+**/.wrangler/
+/.local-tools/
+**/.sites-runtime/
+**/.openai/
+**/outputs/
+artifacts/
+output/
+**/.DS_Store
+*.sqlite
+*.db

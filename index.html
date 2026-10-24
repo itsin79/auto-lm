@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1DBF98">
+  <title>اتو ال‌ام | کارشناسی خودرو</title>
+  <link rel="icon" type="image/png" href="assets/auto-ml-logo.png">
+  <link rel="preload" as="image" href="assets/auto-ml-logo.png">
+  <link rel="stylesheet" href="style.css">
+  <script src="api-client.js" defer></script>
+  <script src="/admin/domain.js" defer></script>
+  <script src="/admin/report.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="server-sync-status" class="server-sync-banner" role="alert" hidden><span></span><button type="button" id="retry-server-sync">تلاش دوباره</button></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="plate-letter-sheet" class="plate-letter-sheet" aria-labelledby="plate-letter-title" aria-describedby="plate-letter-description">
+    <div class="plate-picker-handle" aria-hidden="true"></div>
+    <div class="plate-picker-content">
+      <div class="plate-picker-header">
+        <div><h2 id="plate-letter-title">انتخاب حرف پلاک</h2><p id="plate-letter-description">حرف درج‌شده روی پلاک را انتخاب کنید.</p></div>
+        <button type="button" class="icon-control sheet-close" id="close-plate-letter" aria-label="بستن انتخاب حرف پلاک"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="plate-picker-context"><span>پیش‌نمایش پلاک</span><div id="plate-letter-preview" class="plate-picker-preview" dir="ltr" aria-hidden="true"></div></div>
+      <div id="plate-letter-options" class="plate-letter-options" role="listbox" aria-label="حروف پلاک"></div>
+      <div class="plate-picker-footer"><span>انتخاب با یک لمس ثبت می‌شود.</span><button type="button" class="plate-picker-clear" id="clear-plate-letter">پاک کردن انتخاب</button></div>
+    </div>
+  </dialog>
+  <dialog id="steps-sheet" class="steps-sheet" aria-labelledby="steps-title">
+    <div class="sheet-content">
+      <div class="sheet-header"><h2 id="steps-title">مراحل کارشناسی</h2><button type="button" class="icon-control sheet-close" id="close-steps" aria-label="بستن فهرست مراحل"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div id="steps-content"></div>
+      <button type="button" class="btn btn-primary btn-large btn-block" id="ack-steps">متوجه شدم</button>
+    </div>
+  </dialog>
+  <dialog id="note-sheet" class="steps-sheet note-sheet" aria-labelledby="note-title">
+    <div class="sheet-content note-sheet-content">
+      <div class="sheet-header"><h2 id="note-title">یادداشت کارشناس</h2><button type="button" class="icon-control sheet-close" id="close-note" aria-label="بستن یادداشت"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <p class="small muted note-sheet-hint">متن خودکار در پیش‌نویس نگه داشته می‌شود؛ با «ذخیره یادداشت» در گزارش همین مورد ثبت می‌شود.</p>
+      <label class="field-label" for="note-editor">توضیحات این مورد</label>
+      <textarea class="text-area note-editor" id="note-editor" maxlength="250" placeholder="مثلاً محل ایراد یا توضیح بیشتر را بنویسید..." dir="rtl"></textarea>
+      <div class="note-meta"><span>حداکثر ۲۵۰ نویسه</span><span id="note-count" aria-live="polite">۰ / ۲۵۰</span></div>
+      <div class="note-sheet-actions">
+        <button type="button" class="btn btn-primary btn-large" id="save-note">ذخیره یادداشت</button>
+        <button type="button" class="btn btn-secondary btn-large" id="cancel-note">انصراف</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="history-filter-sheet" class="steps-sheet history-filter-sheet" aria-labelledby="history-filter-title">
+    <div class="sheet-content">
+      <div class="sheet-header"><h2 id="history-filter-title">مرتب‌سازی کارشناسی‌ها</h2><button type="button" class="icon-control sheet-close" id="close-history-filter" aria-label="بستن مرتب‌سازی"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <fieldset class="history-sort-options"><legend class="field-label">ترتیب نمایش</legend>
+        <label class="history-sort-option"><span>جدیدترین</span><input type="radio" name="history-sort" value="newest" data-history-sort checked></label>
+        <label class="history-sort-option"><span>قدیمی‌ترین</span><input type="radio" name="history-sort" value="oldest" data-history-sort></label>
+      </fieldset>
+      <button type="button" class="btn btn-primary btn-large btn-block" id="apply-history-filter">اعمال مرتب‌سازی</button>
+    </div>
+  </dialog>
+</body>
+</html>
