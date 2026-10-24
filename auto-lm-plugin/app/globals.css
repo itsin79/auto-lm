@@ -1,0 +1,2 @@
+/* The plugin shares its small RTL stylesheet with printable reports. */
+@import "../public/plugin.css";
